@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, flash, redirect, url_for, session
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
-import re
 import _md5
 
 app = Flask(__name__)
@@ -24,9 +23,29 @@ def index():
     return render_template("index.html", header=header)
 
 
+@app.route('/about', methods=('GET',))
+def about():
+    header = {
+        "img_url": "assets/img/bg1.jpg",
+        "title": "About Home At Last",
+        "subtitle": "About Home At Last. Welcome to the about page where you can learn about our company and our mission statement."
+    }
+    return render_template("about.html", header=header)
+
+
+@app.route('/contact', methods=('GET',))
+def contact():
+    header = {
+        "img_url": "assets/img/bg2.jpg",
+        "title": "Contact Home At Last",
+        "subtitle": "Contact Home At Last and we will get back to you in a short amount of time!"
+    }
+    return render_template("contact.html", header=header)
+
+
 @app.route('/login', methods=('GET', 'POST'))
 def login():
-    if request.method == 'POST' and 'email' in request.form and 'password' in request.form:
+    if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         valid = True
@@ -51,13 +70,29 @@ def login():
                 flash("There has been an error logging you in, try again!", "danger")
                 return redirect("login")
     else:
-        return render_template("login.html")
+        header = {
+            "img_url": "assets/img/bg7.jpg",
+            "title": "Login To Your Account",
+            "subtitle": "Login to your account so you can make payments or find the next home you want to live in!",
+        }
+        return render_template("login.html", header=header)
 
 
 @app.route('/register', methods=('GET', 'POST'))
 def register():
     if request.method == 'POST':
         valid = True
+        username = request.form['username']
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        email = request.form['email']
+        password = _md5.md5(request.form['password']).hexdigest()
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+        user = cur.fetchone()
+        if user:
+            flash("Email already exists", "info")
+            return redirect("/login")
         if request.form['email'] == "":
             valid = False
             flash("Email cannot be empty", 'danger')
@@ -76,41 +111,35 @@ def register():
         if not valid:
             return redirect('/')
         else:
-            try:
-                cur = mysql.get_db().cursor()
-                data = {
-                    "username": request.form['username'],
-                    "first_name": request.form['first_name'],
-                    "last_name": request.form['last_name'],
-                    "email": request.form['email'],
-                    "password": _md5.md5(request.form['password']).hexdigest(),
-                }
-                cur.execute('''INSERT INTO `rental_db`.`users` (`first_name`, `last_name`, `username`, `email`, `password`, `created_at`) VALUES (:first_name, :last_name, :username, :email, :password, now())''')
-                cur.commit()
-                flash("Successfully Registered. Login now", 'success')
-                return redirect('/')
-            except Exception as e:
-                print(f"{e}")
+            cur.execute('INSERT INTO users VALUES (%s, %s, %s, %s, %s)',
+                        (first_name, last_name, username, email, password))
+            cur.connection.commit()
+            flash("Successfully Registered. Login now", 'success')
+            return redirect('/login')
     else:
-        return render_template("register.html")
+        header = {
+            "img_url": "assets/img/bg6.jpg",
+            "title": "Register Today",
+            "subtitle": "You are just a form away from becoming a member to this site to find the house or condo that you love!",
+        }
+        return render_template("register.html", header=header)
 
 
 @app.route('/logout')
 def logout():
-    # Remove session data, this will log the user out
-   session.pop('loggedin', None)
-   session.pop('id', None)
-   session.pop('email', None)
-   # Redirect to login page
-   return redirect(url_for('login'))
+    session.pop('loggedin', None)
+    session.pop('id', None)
+    session.pop('email', None)
+    return redirect(url_for('login'))
 
 
 @app.route('/admin', methods=('GET', 'POST'))
 def admin():
     if request.method == 'POST':
-        return render_template("admin/index.html")
+        pass
     else:
         return render_template("admin/index.html")
+
 
 if __name__ == '__main__':
     app.run()
